@@ -4,11 +4,16 @@ using System;
 
 public class LoadScene : MonoBehaviour 
 {
-	public string sceneBundle;
-	public string sceneName;
+	[SerializeField] string sceneBundle;
+	[SerializeField] string sceneName;
+	[SerializeField] string optionalVariantBundle;
+	[SerializeField] string optionalVariantName;
 	
 	IEnumerator Start () 
 	{
+		if (!string.IsNullOrEmpty (optionalVariantBundle) && !string.IsNullOrEmpty (optionalVariantName))
+			BundleManager.instance.RegisterVariant (optionalVariantBundle, optionalVariantName);
+
 		while (!BundleManager.instance.isReady)
 			yield return null;
 

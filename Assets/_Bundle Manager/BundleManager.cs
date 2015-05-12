@@ -5,19 +5,16 @@ using System.Collections.Generic;
 public class BundleManager : MonoBehaviour 
 {
 	public static BundleManager instance;
-	public string[] bundleVariants;
 
 	[SerializeField] string pathToBundles;
 
 	Dictionary<string, AssetBundle> bundles;
+	Dictionary<string, string> bundleVariants;
 	AssetBundleManifest manifest = null;
 
-	public bool isReady
+	public bool isReady 
 	{
-		get
-		{
-			return !object.ReferenceEquals(manifest, null);
-		}
+		get { return !object.ReferenceEquals(manifest, null);}
 	}
 
 
@@ -56,6 +53,7 @@ public class BundleManager : MonoBehaviour
 
 		pathToBundles += platform + "/";
 		bundles = new Dictionary<string, AssetBundle> ();
+		bundleVariants = new Dictionary<string, string> ();
 		StartCoroutine (LoadManifest(platform));
 	}
 
@@ -86,6 +84,18 @@ public class BundleManager : MonoBehaviour
 	public bool IsBundleLoaded(string bundleName)
 	{
 		return bundles.ContainsKey (bundleName);
+	}
+
+	public void RegisterVariant(string bundleName, string variantName)
+	{
+		if (bundleVariants.ContainsValue (bundleName)) 
+		{
+			Debug.Log(string.Format("Variant for {0} cannot be added. {1} already registered. " +
+				"Two vartiants of same bundle cannot be loaded (this is a safety check)", bundleName, variantName));
+			return;
+		}
+
+		bundleVariants.Add (bundleName, variantName);
 	}
 
 	public Object GetAssetFromBundle(string bundleName, string assetName)
@@ -145,23 +155,19 @@ public class BundleManager : MonoBehaviour
 	
 	string RemapVariantName(string assetBundleName)
 	{
-		string[] bundlesWithVariant = manifest.GetAllAssetBundlesWithVariant();
-
-		if (System.Array.IndexOf(bundlesWithVariant, assetBundleName) < 0 )
-			return assetBundleName;
-		
 		string[] splitBundleName = assetBundleName.Split('.');
-		string[] candidateBundles = System.Array.FindAll (bundlesWithVariant, element => element.StartsWith(splitBundleName [0]));
+		string variant;
 
-		int index = -1;
-		for(int i = 0; i < bundleVariants.Length; i++)
-		{
-			index = System.Array.IndexOf(candidateBundles, splitBundleName[0] + "." + bundleVariants[i]);
-			if(index != -1)
-				return candidateBundles[index];
-		}
+		if (!bundleVariants.TryGetValue(splitBundleName[0], out variant))
+			return assetBundleName;
 
-		return assetBundleName;
+		string[] bundlesWithVariant = manifest.GetAllAssetBundlesWithVariant();
+		string newBundleName = splitBundleName [0] + "." + variant;
+
+		if (System.Array.IndexOf(bundlesWithVariant, newBundleName) < 0 )
+			return assetBundleName;
+
+		return newBundleName;
 	}
 }
 
