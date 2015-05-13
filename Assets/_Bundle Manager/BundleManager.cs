@@ -1,6 +1,8 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.IO;
 
 public class BundleManager : MonoBehaviour 
 {
@@ -11,6 +13,7 @@ public class BundleManager : MonoBehaviour
 	Dictionary<string, AssetBundle> bundles;
 	Dictionary<string, string> bundleVariants;
 	AssetBundleManifest manifest = null;
+	string platform;
 
 	public bool isReady 
 	{
@@ -20,6 +23,8 @@ public class BundleManager : MonoBehaviour
 
 	void Awake()
 	{
+		System.Environment.SetEnvironmentVariable("MONO_REFLECTION_SERIALIZER","yes");
+
 		if (object.ReferenceEquals (instance, null)) 
 		{
 			instance = this;
@@ -32,7 +37,7 @@ public class BundleManager : MonoBehaviour
 
 		DontDestroyOnLoad (gameObject);
 
-		string platform = "";
+		platform = "";
 
 		#if UNITY_IOS
 				platform = "iOS";
@@ -54,20 +59,33 @@ public class BundleManager : MonoBehaviour
 		pathToBundles += platform + "/";
 		bundles = new Dictionary<string, AssetBundle> ();
 		bundleVariants = new Dictionary<string, string> ();
-		StartCoroutine (LoadManifest(platform));
+		StartCoroutine (LoadManifest());
 	}
 
-	IEnumerator LoadManifest (string platform) 
+	IEnumerator LoadManifest () 
 	{
 		Debug.Log( "Loading Manifest");
-		
+
+		AssetBundle bundle;
+
 		using(WWW www = new WWW(pathToBundles + platform))
 		{
 			yield return www;
 			if(!string.IsNullOrEmpty(www.error))
 			{
 				Debug.Log(www.error);
-				return false;
+				Debug.Log("Attempting to load a local copy of the manifest");
+
+				bundle = LoadManifestFromFile();
+				if(object.ReferenceEquals(bundle, null))
+				{
+					Debug.Log ("No local copy of manifest bundle found");
+					yield break;
+				}
+			}
+			else
+			{
+				SaveManifestToFile(www);
 			}
 
 			manifest = (AssetBundleManifest)www.assetBundle.LoadAsset("AssetBundleManifest", typeof(AssetBundleManifest));
@@ -77,8 +95,45 @@ public class BundleManager : MonoBehaviour
 
 		if (!isReady)
 			Debug.Log ("There was an error loading manifest");
-		else
+		else 
 			Debug.Log ("Manifest loaded successfully");
+	}
+
+	void SaveManifestToFile(WWW www)
+	{
+		File.WriteAllBytes (Application.persistentDataPath + "/" + platform, www.bytes);
+	}
+
+	AssetBundle LoadManifestFromFile()
+	{
+		if (!File.Exists (Application.persistentDataPath + "/" + platform))
+		{
+			Debug.Log("Local copy of manifest doesn't exist");
+			return null;
+		}
+
+		try
+		{
+			byte[]  bytes = File.ReadAllBytes (Application.persistentDataPath + "/" + platform);
+			AssetBundle bundle;
+
+			using (MemoryStream mem = new MemoryStream())
+			{
+				BinaryFormatter bf = new BinaryFormatter();
+				mem.Write(bytes, 0, bytes.Length);
+				mem.Seek(0, SeekOrigin.Begin);
+				using (WWW www = (WWW)bf.Deserialize(mem))
+				{
+					bundle = www.assetBundle;
+				}
+				return bundle;
+			}
+		}
+		catch(System.Exception e)
+		{
+			Debug.Log(e.Message);
+			return null;
+		}
 	}
 
 	public bool IsBundleLoaded(string bundleName)
@@ -134,7 +189,7 @@ public class BundleManager : MonoBehaviour
 			if(!string.IsNullOrEmpty(www.error))
 			{
 				Debug.Log(www.error);
-				return false;
+				yield break;
 			}
 
 			bundles.Add(bundleName, www.assetBundle);

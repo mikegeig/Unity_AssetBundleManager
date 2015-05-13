@@ -132,7 +132,7 @@ Prefab:
       objectReference: {fileID: 0}
     - target: {fileID: 11431270, guid: 4af332379aa67114d885054ecff9fd5a, type: 2}
       propertyPath: pathToBundles
-      value: file:///E:/AssetBundles/
+      value: file:///Users/mikegeig/GitHub Repos/Unity_AssetBundleManager/Builds/Bundles/
       objectReference: {fileID: 0}
     - target: {fileID: 11431270, guid: 4af332379aa67114d885054ecff9fd5a, type: 2}
       propertyPath: bundleVariants.Array.data[0]
@@ -156,7 +156,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1210753091
 MonoBehaviour:
   m_ObjectHideFlags: 0
