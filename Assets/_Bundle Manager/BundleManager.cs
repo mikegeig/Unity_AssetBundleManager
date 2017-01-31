@@ -62,9 +62,14 @@ public class BundleManager : MonoBehaviour
 		StartCoroutine (LoadManifest());
 	}
 
-	IEnumerator LoadManifest () 
+	private class Transfer
 	{
-		Debug.Log( "Loading Manifest");
+		public AssetBundle bundle;
+	}
+
+	private IEnumerator LoadManifest()
+	{
+		Debug.Log("Loading Manifest");
 
 		AssetBundle bundle;
 
@@ -76,22 +81,26 @@ public class BundleManager : MonoBehaviour
 				Debug.Log(www.error);
 				Debug.Log("Attempting to load a local copy of the manifest");
 
-				bundle = LoadManifestFromFile();
-				if(object.ReferenceEquals(bundle, null))
+				var transfer = new Transfer();
+				yield return StartCoroutine(LoadManifestFromFile(transfer));
+
+				if (transfer.bundle == null)
 				{
 					Debug.Log ("No local copy of manifest bundle found");
 					yield break;
 				}
+				bundle = transfer.bundle;
 			}
 			else
 			{
 				SaveManifestToFile(www);
+				bundle = www.assetBundle;
 			}
 
-			manifest = (AssetBundleManifest)www.assetBundle.LoadAsset("AssetBundleManifest", typeof(AssetBundleManifest));
+			manifest = (AssetBundleManifest)bundle.LoadAsset("AssetBundleManifest", typeof(AssetBundleManifest));
 			yield return null;
-			www.assetBundle.Unload(false);
-		} 
+			bundle.Unload(false);
+		}
 
 		if (!isReady)
 			Debug.Log ("There was an error loading manifest");
@@ -99,41 +108,44 @@ public class BundleManager : MonoBehaviour
 			Debug.Log ("Manifest loaded successfully");
 	}
 
-	void SaveManifestToFile(WWW www)
+	private void SaveManifestToFile(WWW www)
 	{
 		File.WriteAllBytes (Application.persistentDataPath + "/" + platform, www.bytes);
 	}
 
-	AssetBundle LoadManifestFromFile()
+	private IEnumerator LoadManifestFromFile(Transfer transfer)
 	{
-		if (!File.Exists (Application.persistentDataPath + "/" + platform))
+		transfer.bundle = null;
+
+		if (File.Exists(Application.persistentDataPath + "/" + platform) == false)
 		{
 			Debug.Log("Local copy of manifest doesn't exist");
-			return null;
+			yield break;
 		}
+
+		AssetBundleCreateRequest assetBundleCreateRequest;
 
 		try
 		{
-			byte[]  bytes = File.ReadAllBytes (Application.persistentDataPath + "/" + platform);
-			AssetBundle bundle;
-
-			using (MemoryStream mem = new MemoryStream())
-			{
-				BinaryFormatter bf = new BinaryFormatter();
-				mem.Write(bytes, 0, bytes.Length);
-				mem.Seek(0, SeekOrigin.Begin);
-				using (WWW www = (WWW)bf.Deserialize(mem))
-				{
-					bundle = www.assetBundle;
-				}
-				return bundle;
-			}
+			byte[] bytes = File.ReadAllBytes(Application.persistentDataPath + "/" + platform);
+			assetBundleCreateRequest = AssetBundle.CreateFromMemory(bytes);
 		}
 		catch(System.Exception e)
 		{
 			Debug.Log(e.Message);
-			return null;
+			yield break;
 		}
+
+		if (assetBundleCreateRequest == null)
+		{
+			Debug.Log("AssetBundle.CreateFromMemory failed");
+			yield break;
+		}
+
+		while (assetBundleCreateRequest.isDone == false)
+			yield return null;
+
+		transfer.bundle = assetBundleCreateRequest.assetBundle;
 	}
 
 	public bool IsBundleLoaded(string bundleName)
